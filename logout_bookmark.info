@@ -1,0 +1,8 @@
+name = Log out bookmark
+package = "EWP"
+description = A simple Drupal module that will remember the page URL when a "logout" (/?q=logout) link is clicked.
+
+dependancies[] quiz
+dependancies[] cource
+
+core = 7.x

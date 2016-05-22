@@ -1,0 +1,111 @@
+<?php
+
+/**
+ * Implementation of hook_install().
+ */
+function logout_bookmark_install() {
+	
+	// Check if our field is not already created.
+	$field_name = 'user_bookmark_url';
+	
+	if (! field_info_field ( $field_name )) {
+		
+		$field = array (
+				'field_name' => $field_name,
+				'type' => 'text_long',
+				'entity_types' => array (
+						'user' 
+				),
+				'cardinality' => 1 
+		);
+		field_create_field ( $field );
+	}
+	if (! field_info_instance ( 'user', $field_name, 'user' )) {
+		// Create the instance on the bundle.
+		$instance = array (
+				'field_name' => $field_name,
+				'entity_type' => 'user',
+				'label' => t ( 'Last page' ),
+				'bundle' => 'user',
+				'settings' => array (
+						'user_register_form' => FALSE,
+						'visible' => FALSE,
+						'max_length' => '' 
+				) 
+		);
+		field_create_instance ( $instance );
+	}
+	
+	$field_name = 'user_bookmark_last';
+	
+	if (! field_info_field ( $field_name )) {
+		$field = array (
+				'field_name' => $field_name,
+				'entity_types' => array (
+						'user' 
+				),
+				'type' => 'list_boolean',
+				'cardinality' => 1,
+				'settings' => array (
+						'allowed_values' => array (
+								0 => 'No',
+								1 => 'Yes' 
+						),
+						'default_value' => 0 
+				) 
+		);
+		
+		field_create_field ( $field );
+	}
+	
+	if (! field_info_instance ( 'user', $field_name, 'user' )) {
+		// Create the instance on the bundle.
+		$instance = array (
+				'field_name' => $field_name,
+				'label' => t ( 'Remember last page' ),
+				'description' => t ( 'This will bookmark the page you were on when you log out and return you to that page when you log in again.' ),
+				'entity_type' => 'user',
+				'bundle' => 'user',
+				'required' => TRUE,
+				'settings' => array (
+						'user_register_form' => 1,
+						'visible' => 1 
+				),
+				'widget' => array (
+						'type' => 'options_onof',
+						'weight' => '20',
+						'settings' => array (
+								'display_label' => 1 
+						) 
+				),
+				'settings' => array (
+						'user_register_form' => 1 
+				) 
+		);
+		field_create_instance ( $instance );
+	}
+}
+
+/**
+ * Implementation of hook_install().
+ */
+function logout_bookmark_uninstall() {
+	$fields = array (
+			'user_bookmark_url',
+			'user_bookmark_last' 
+	);
+	
+	foreach ( $fields as $field_name ) {
+		
+		if (field_info_field ( $field_name )) {
+			field_delete_field ( $field_name );
+		}
+		
+		if (field_info_instance ( 'user', $field_name, 'user' )) {
+			$instance = field_info_instances ( 'user', $field_name, 'user' );
+			field_delete_instance ( $instance );
+		}
+	}
+	
+	field_purge_batch ( 2 );
+}

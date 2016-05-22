@@ -1,0 +1,115 @@
+<?php
+
+/**
+ * @file
+ * A simple Drupal module that will remember the page URL a user is viewing
+ * when a "logout" (/?q=logout) link is clicked and, upon subsequent login will
+ * take them back to that page. Used with Quiz/Cource modules but can be
+ * extended to other areas as well. Ight now it does a custom job.
+ *
+ * Base code/idea came from https://gist.github.com/santyr/1155428 - Thanks
+ *
+ */
+function logout_bookmark_help( $section ) {
+	switch ($section) {
+		case 'admin/modules#description' :
+			return t ( 'A simple Drupal module that will remember the page URL a user is viewing when a
+"logout" (/?q=logout) link is clicked and, upon subsequent login will take them back to that
+page.' );
+	}
+}
+
+function logout_bookmark_user_logout( $account ) {
+	$user_info = user_load ( $account->uid );
+	$url = $_SERVER ["HTTP_REFERER"];
+	
+	$referer = logout_bookmark_get_path_from_url ( $url );
+	
+	if (isset ( $user_info->user_bookmark_last ['und'] [0] ['value'] ) && $user_info->user_bookmark_last ['und'] [0] ['value'] == 1) {
+		$edit = array (
+				'user_bookmark_url' => array (
+						'und' => array (
+								0 => array (
+										'value' => serialize ( $referer ) 
+								) 
+						) 
+				) 
+		);
+		user_save ( $account, $edit );
+	}
+}
+
+function logout_bookmark_user_login( &$edit, $account ) {
+	$user_info = user_load ( $account->uid );
+	$destination = '';
+	
+	// $edit will empty with one time login
+	if (! empty ( $edit )) {
+		
+		// make sure the password reset functionality is not impaired.
+		if (! isset ( $_POST ['form_id'] ) || $_POST ['form_id'] != 'user_pass_reset') {
+			
+			if (isset ( $user_info->user_bookmark_last ['und'] [0] ['value'] ) && $user_info->user_bookmark_last ['und'] [0] ['value'] == 1 && isset ( $user_info->user_bookmark_url ['und'] [0] ['value'] )) {
+				
+				$bookmark = unserialize ( $user_info->user_bookmark_url ['und'] [0] ['value'] );
+				
+				if (! empty ( $bookmark ['session'] )) {
+					$_SESSION = $bookmark ['session'];
+				}
+				
+				if ($bookmark ['path']) {
+					$options ['query'] = $bookmark ['query'];
+					$options ['fragment'] = $bookmark ['fragment'];
+					$path = $bookmark ['path'];
+					
+					// drupal_goto doesn't work on user login redirect.
+					// use ctool ajax redirect instead.
+					ctools_include ( 'ajax' );
+					$commands [ ] = ctools_ajax_command_redirect ( $path, 0, $options );
+					print ajax_render ( $commands );
+					exit ( );
+				}
+			}
+		}
+	}
+}
+
+/**
+ * Returns internal path, query and fragment from external URL
+ */
+function logout_bookmark_get_path_from_url( $url, $normal_path = TRUE ) {
+	global $base_path;
+	
+	// Get hostname
+	preg_match ( "/^(https?:\/\/)?([^\/]+)/i", $url, $domain );
+	
+	// Format localhost + base_path (http://hostname/drupalbase)
+	$base = (isset ( $domain [0] ) ? $domain [0] : '') . $base_path;
+	
+	// If $url contains $base, remove the $base part
+	if (strpos ( $url, $base ) === 0) {
+		$path = str_replace ( $base, '', $url );
+		
+		// $url is presumed to be without $base part (internal path?)
+	} else {
+		$path = $url;
+	}
+	
+	$result = drupal_parse_url ( $path );
+	
+	if ($normal_path) {
+		$result ['path'] = drupal_get_normal_path ( $result ['path'] );
+	}
+	
+	// Added to take care of Quize and Cource module.
+	if (! empty ( $_SESSION )) {
+		if (isset ( $_SESSION ['course'] )) {
+			$result ['session'] ['course'] = $_SESSION ['course'];
+		}
+		if (isset ( $_SESSION ['quiz'] )) {
+			$result ['session'] ['quiz'] = $_SESSION ['quiz'];
+		}
+	}
+	
+	return $result;
+}
